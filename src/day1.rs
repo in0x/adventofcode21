@@ -56,5 +56,18 @@ pub fn run(root_dir:  &Path) {
 
     println!("Single depth increased {} times", number_of_increases);
 
+    let three_sum_count = (num_count / 3) * 3;
+    let mut num_three_sum_increase = 0;
+    for i in 1..three_sum_count {
+        
+        let lhs_idx = i - 1;
+        let lhs_sum = numbers[lhs_idx] + numbers[lhs_idx + 1] + numbers[lhs_idx + 2]; 
+        let rhs_sum = numbers[i]       + numbers[i + 1]       + numbers[i + 2]; 
 
+        if rhs_sum > lhs_sum {
+            num_three_sum_increase += 1;
+        }
+    }
+
+    println!("Sliding window sum increased {} times", num_three_sum_increase);
 }
