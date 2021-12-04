@@ -7,8 +7,7 @@ fn main() {
 
     if args.len() < 2 {
         print!("Not enough args provided!
-                Usage:
-                -- <path_to_input_files>");
+                Usage: -- <path_to_input_files>");
         return;
     }
 
