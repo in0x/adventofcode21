@@ -46,13 +46,15 @@ pub fn run(root_dir:  &Path) {
     let num_count = numbers.len();
     println!("Parsed {} numbers!", num_count);
 
-    let mut number_of_increases = 1;
+    let mut number_of_increases = 0;
 
-    for i in 2..num_count {
+    for i in 1..num_count {
         if numbers[i] > numbers[i - 1] {
             number_of_increases += 1;
         }
     }
 
-    println!("Depth increased {} times", number_of_increases);
+    println!("Single depth increased {} times", number_of_increases);
+
+
 }
