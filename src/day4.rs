@@ -172,7 +172,7 @@ pub fn run(root_dir: &Path) {
 
     let no_solution_mask = 31; // 2^5 -1
 
-    let mut earliest_solving_idxs = Vec::new();
+    let mut earliest_solve_idxs = Vec::new();
 
     for board in &boards {
         let mut solver = BoardSolver::new();
@@ -214,18 +214,33 @@ pub fn run(root_dir: &Path) {
             lowest_drawn_idx = lowest_drawn_idx.min(solver.highest_col_idx[i]);
         }
 
-        earliest_solving_idxs.push(lowest_drawn_idx);
+        earliest_solve_idxs.push(lowest_drawn_idx);
     }
 
-    let mut earliest_solve_i = 0;
-    for i in 0..earliest_solving_idxs.len() {
-        if earliest_solving_idxs[i] < earliest_solving_idxs[earliest_solve_i] {
-            earliest_solve_i = i;
+    let pick_earliest_win = false; 
+
+    let final_solving_i = {
+        if pick_earliest_win {
+            let mut earliest_solve_i = 0;
+            for i in 0..earliest_solve_idxs.len() {
+                if earliest_solve_idxs[i] < earliest_solve_idxs[earliest_solve_i] {
+                    earliest_solve_i = i;
+                }
+            }
+            earliest_solve_i
+        } else {
+            let mut last_solve_i = 0;
+            for i in 0..earliest_solve_idxs.len() {
+                if earliest_solve_idxs[i] > earliest_solve_idxs[last_solve_i] {
+                    last_solve_i = i;
+                }
+            }
+            last_solve_i
         }
-    }
+    };
     
-    let solved_board = &boards[earliest_solve_i];
-    let idx_of_final_drawn = earliest_solving_idxs[earliest_solve_i] as usize;
+    let solved_board = &boards[final_solving_i];
+    let idx_of_final_drawn = earliest_solve_idxs[final_solving_i] as usize;
     let final_drawn_numbers = &drawn_numbers[..idx_of_final_drawn + 1];
 
     let mut score = 0;
@@ -234,12 +249,10 @@ pub fn run(root_dir: &Path) {
             let cur_val = solved_board.rows[row_i][col_i];
             if !final_drawn_numbers.contains(&cur_val) {
                 score += cur_val;
-            } else {
-                println!("drawn {}", cur_val);
-            }
+            } 
         }
     }
 
-    let final_number_i = earliest_solving_idxs[earliest_solve_i] as usize;
+    let final_number_i = earliest_solve_idxs[final_solving_i] as usize;
     println!("Final score {}", score * drawn_numbers[final_number_i]);
 }
