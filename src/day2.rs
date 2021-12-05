@@ -48,8 +48,11 @@ pub fn run(root_dir: &Path) {
     let down_skip = 4;
     let up_skip = 2;
 
-    let mut total_z = 0;
-    let mut total_y = 0;
+    let use_pitch = true;
+
+    let mut total_z  = 0;
+    let mut total_y: i32 = 0;
+    let mut pitch: i32 = 0;
 
     let mut i = 0;
     loop {
@@ -71,13 +74,25 @@ pub fn run(root_dir: &Path) {
         let (mag, new_i) = parse_number(&input_bytes, i);
 
         i = new_i;
-        match nav_char as char {
-            'f' => total_z += mag,
-            'u' => total_y -= mag,
-            'd' => total_y += mag,
-            _ => (),
+        if use_pitch {
+            match nav_char as char {
+                'f' => {
+                    total_z += mag;
+                    total_y += mag as i32 * pitch;
+                },
+                'u' => pitch -= mag as i32,
+                'd' => pitch += mag as i32,
+                _ => (),
+            }
+        } else {
+            match nav_char as char {
+                'f' => total_z += mag,
+                'u' => total_y -= mag as i32,
+                'd' => total_y += mag as i32,
+                _ => (),
+            }
         }
-
+        
         if i >= input_bytes.len() {
             break;
         }
@@ -91,5 +106,5 @@ pub fn run(root_dir: &Path) {
     }
 
     println!("Total y {} , Total z {}", total_y, total_z);
-    println!("Combined {}", total_y * total_z);
+    println!("Combined {}", total_y * total_z as i32);
 }

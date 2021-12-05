@@ -1,6 +1,4 @@
 use super::common;
-
-use std::fs;
 use std::path::Path;
 
 fn parse_numbers_forward(input_bytes: &Vec<u8>) -> Vec<u32> {
@@ -52,6 +50,7 @@ fn parse_numbers_forward(input_bytes: &Vec<u8>) -> Vec<u32> {
     numbers
 }
 
+#[allow(dead_code)]
 fn parse_numbers_reverse(input_bytes: &Vec<u8>) -> Vec<u32> {
     let mut numbers = Vec::new();
     
