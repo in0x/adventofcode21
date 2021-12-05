@@ -29,15 +29,9 @@ fn parse_number(bytes: &Vec<u8>, mut cursor: usize) -> (u32, usize) {
         }
     }
  
-    let mut accumulator: u32  = 0;
-    let mut position = 1;
-
-    for digit in cur_token.iter().rev() {
-        accumulator += (*digit as u32) * position;
-        position *= 10;
-    }
-
-    (accumulator, cursor)
+    
+    let result = common::build_u32(&cur_token); 
+    (result, cursor)
 }
 
 pub fn run(root_dir: &Path) {

@@ -9,3 +9,15 @@ pub fn read_input_bytes(file_path: &Path) -> Vec<u8> {
         Ok(bytes) => bytes
     }
 }
+
+pub fn build_u32(digits: &Vec<u8>) -> u32 {
+    let mut accumulator: u32  = 0;
+    let mut position = 1;
+
+    for digit in digits.iter().rev() {
+        accumulator += (*digit as u32) * position;
+        position *= 10;
+    }
+
+    accumulator
+}
