@@ -62,9 +62,9 @@ pub fn run(root_dir: &Path) {
         }
     }
 
-    lines = lines.into_iter().filter(|line| {
-                (line.x1 == line.x2) || (line.y1 == line.y2)
-        }).collect();
+    // lines = lines.into_iter().filter(|line| {
+    //             (line.x1 == line.x2) || (line.y1 == line.y2)
+    //     }).collect();
 
     let mut max_x = 0;
     let mut max_y = 0;
@@ -90,12 +90,37 @@ pub fn run(root_dir: &Path) {
             for i in min..=max {
                 inc_grid_cell(line.x1, i);
             }
-        } else {
+        } else if line.y1 == line.y2 {
             let min = i32::min(line.x1, line.x2);
             let max = i32::max(line.x1, line.x2);
 
             for i in min..=max {
                 inc_grid_cell(i, line.y1);
+            }
+        } else {
+            let x_dir = match line.x2 > line.x1 {
+                true => 1,
+                false => -1,
+            };
+
+            let y_dir = match line.y2 > line.y1 {
+                true => 1,
+                false => -1,
+            };
+
+            let mut o_x = line.x1;
+            let mut o_y = line.y1;
+
+
+            loop  {
+                inc_grid_cell(o_x, o_y);
+
+                if (o_x == line.x2) && (o_y == line.y2) {
+                    break;
+                }
+
+                o_x += x_dir;
+                o_y += y_dir;
             }
         }
     }
