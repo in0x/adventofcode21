@@ -111,7 +111,6 @@ pub fn run(root_dir: &Path) {
             let mut o_x = line.x1;
             let mut o_y = line.y1;
 
-
             loop  {
                 inc_grid_cell(o_x, o_y);
 
