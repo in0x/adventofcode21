@@ -21,3 +21,27 @@ pub fn build_u32(digits: &Vec<u8>) -> u32 {
 
     accumulator
 }
+
+// Returns a pair of the parsed number and the new cursor. The cursor
+// will sit at the first position past the parsed number.
+pub fn parse_num(bytes: &Vec<u8>, token_buf: &mut Vec<u8>, mut cursor: usize) -> (Option<u32>, usize) {
+    while cursor < bytes.len() {
+        match bytes[cursor] as char {
+            '0'..='9' => {
+                let digit_val = bytes[cursor] - ('0' as u8);
+                token_buf.push(digit_val);    
+            },
+            _ => break,
+        }
+
+        cursor += 1;
+    }
+
+    if token_buf.len() > 0 {
+        let num = build_u32(token_buf);
+        token_buf.clear();
+        (Some(num), cursor)
+    } else {
+        (None, cursor)
+    }
+}
