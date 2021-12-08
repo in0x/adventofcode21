@@ -45,3 +45,26 @@ pub fn parse_num(bytes: &Vec<u8>, token_buf: &mut Vec<u8>, mut cursor: usize) ->
         (None, cursor)
     }
 }
+
+pub fn read_list_of_csv_u32s(bytes: &Vec<u8>) -> Vec<u32> {
+    let mut cursor = 0;    
+    let mut values: Vec<u32> = Vec::new();
+    let mut token_buf = Vec::new();
+    token_buf.reserve(32);
+
+    while cursor < bytes.len() {
+        match parse_num(&bytes, &mut token_buf, cursor) {
+            (Some(num), new_cursor) => {
+                values.push(num);
+                cursor = new_cursor;
+            },
+            (None, _) => {
+                panic!("We should have a number at each scan, but failed at cursor pos {}", cursor);
+            } 
+        }
+        cursor += 1;
+    }
+
+    values
+    
+}

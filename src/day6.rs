@@ -5,28 +5,7 @@ pub fn run(root_dir: &Path) {
     let input_path = root_dir.join("day6_input.txt");
     let bytes = common::read_input_bytes(input_path.as_path());
 
-    let mut cursor = 0;
-    let initial_values = {
-        let mut values: Vec<u32> = Vec::new();
-
-        let mut token_buf = Vec::new();
-        token_buf.reserve(32);
-    
-        while cursor < bytes.len() {
-            match common::parse_num(&bytes, &mut token_buf, cursor) {
-                (Some(num), new_cursor) => {
-                    values.push(num);
-                    cursor = new_cursor;
-                },
-                (None, _) => {
-                    panic!("We should have a number at each scan, but failed at cursor pos {}", cursor);
-                } 
-            }
-            cursor += 1;
-        }
-
-        values
-    };
+    let initial_values = common::read_list_of_csv_u32s(&bytes);
 
     // Each slot represents a day remaining until duplication.
     // The slot stores how many fish there are with that lifetime remaining.
