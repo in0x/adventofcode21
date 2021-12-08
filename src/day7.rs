@@ -21,6 +21,17 @@ pub fn run(root_dir: &Path) {
         println!("Total fuel non-weighted {}", total_fuel);
     }
 
+    fn get_total_cost(positions: &Vec<u32>, midpoint: u32) -> u32 {
+        let mut total_cost = 0;
+        for pos in positions {
+            let diff = ((*pos as f32) - (midpoint as f32)).abs();
+            let cost_sum = diff * ((1.0 + diff) / 2.0);
+            total_cost += cost_sum as u32;
+        }
+
+        total_cost
+    }
+
     {
         let (min_pos, max_pos) = {
             let mut min = u32::MAX;
@@ -31,17 +42,6 @@ pub fn run(root_dir: &Path) {
             }
             (min, max)
         };
-
-        fn get_total_cost(positions: &Vec<u32>, midpoint: u32) -> u32 {
-            let mut total_cost = 0;
-            for pos in positions {
-                let diff = ((*pos as f32) - (midpoint as f32)).abs();
-                let cost_sum = diff * ((1.0 + diff) / 2.0);
-                total_cost += cost_sum as u32;
-            }
-
-            total_cost
-        }
 
         let mut pos_at_min_cost = 0;
         let mut min_total_cost = u32::MAX;
@@ -54,7 +54,19 @@ pub fn run(root_dir: &Path) {
             }            
         }
 
-        println!("Total weighted cost {}", min_total_cost);
+        println!("Total weighted cost (bruteforce) {} ", min_total_cost);
     }
 
+    {
+        let mean = {
+            let total: u32 = positions.iter().sum();
+            let mean_f = total as f32 / positions.len() as f32;
+
+            f32::min(mean_f.floor(), mean_f.ceil()) as u32
+        };
+
+        let total_fuel = get_total_cost(&positions, mean);
+
+        println!("Total weighted cost (mean) {} ", total_fuel);
+    }
 }
