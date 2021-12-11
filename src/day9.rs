@@ -17,7 +17,7 @@ pub fn run(root_dir: &Path) {
         (width, map)
     };
 
-    let map_height = heightmap.len()  / map_width;
+    let map_height = heightmap.len() / map_width;
 
     let val_at = |x: i32, y: i32| -> u8 {
         let idx = x as usize + (y as usize * map_width);
