@@ -9,7 +9,7 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/aoc21.exe",
-            "args": ["C:/Users/Philipp/adventofcode21/src/"],
+            "args": ["C:\\Users\\philipp.welsch\\Documents\\aoc21\\src"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
