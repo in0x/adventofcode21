@@ -111,6 +111,7 @@ pub fn run(root_dir: &Path) {
         });
     }
 
+    #[allow(unused)]
     fn print_bin(mask: BitMask) {
         println!("  0gfedcba");
         println!("{:#010b}", mask.mask);

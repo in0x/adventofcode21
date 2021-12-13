@@ -2,22 +2,10 @@ use super::common;
 use std::path::Path;
 
 pub fn run(root_dir: &Path) {
-    let (map_width, heightmap) = {
-        let input_path = root_dir.join("day9_input.txt");
-        let bytes = common::read_input_bytes(input_path.as_path());
-    
-        let width = bytes.iter()
-            .position(|c| c.is_ascii_whitespace()).unwrap();
-    
-        let map = bytes.iter()
-            .filter(|c| !c.is_ascii_whitespace())
-            .map(|c| c - ('0' as u8))
-            .collect::<Vec<_>>();
-        
-        (width, map)
-    };
+    let input_path = root_dir.join("day9_input.txt");
+    let bytes = common::read_input_bytes(input_path.as_path());
 
-    let map_height = heightmap.len() / map_width;
+    let (heightmap, map_width, map_height) = common::parse_grid(&bytes);
 
     let val_at = |x: i32, y: i32| -> u8 {
         let idx = x as usize + (y as usize * map_width);

@@ -10,6 +10,21 @@ pub fn read_input_bytes(file_path: &Path) -> Vec<u8> {
     }
 }
 
+// Returns a triple of row-major grid of values, width and height of the grid.
+pub fn parse_grid(bytes: &Vec<u8>) -> (Vec<u8>, usize, usize) {    
+    let width = bytes.iter()
+        .position(|c| c.is_ascii_whitespace()).unwrap();
+
+    let grid = bytes.iter()
+        .filter(|c| !c.is_ascii_whitespace())
+        .map(|c| c - ('0' as u8))
+        .collect::<Vec<_>>();
+
+    let height = grid.len() / width;
+
+    (grid, width, height)
+}
+
 pub fn build_u32(digits: &Vec<u8>) -> u32 {
     let mut accumulator: u32  = 0;
     let mut position = 1;
