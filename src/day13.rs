@@ -157,4 +157,5 @@ pub fn run(root_dir: &Path) {
         }
     }
 
+    println!("\n");
 }
