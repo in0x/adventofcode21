@@ -66,6 +66,8 @@ pub fn run(root_dir: &Path) {
     let input_path = root_dir.join("day12_input.txt");
     let bytes = common::read_input_bytes(input_path.as_path());
 
+    let mut ids = Vec::new();
+
     let (graph, start_id, end_id) = {
         let mut graph: Vec<Node> = Vec::new();
 
@@ -119,6 +121,11 @@ pub fn run(root_dir: &Path) {
             }
         }
 
+        ids.resize(graph.len(), String::default());
+        for kvp in &tok_to_id {
+            ids[*kvp.1] = kvp.0.clone();
+        }
+
         (graph, start_id.unwrap(), end_id.unwrap())
     };
 
@@ -134,6 +141,8 @@ pub fn run(root_dir: &Path) {
     let mut path = Vec::new();
     path.push(start_id);
 
+    let mut small_seal: Option<usize> = None;
+
     while !queue.is_empty() {
         let top_el = queue.front_mut().unwrap();
         let cur_node_id = top_el.0;
@@ -143,16 +152,29 @@ pub fn run(root_dir: &Path) {
                 num_paths += 1;
             }
 
-            closed[cur_node_id] = false;
+            if small_seal == Some(queue.len()) {
+                small_seal = None;
+            } else {
+                closed[cur_node_id] = false;
+            }
+
             path.pop();
             queue.pop_front();
         } else {
             let next_node_id = graph[cur_node_id].connections[top_el.1 - 1];
+            let next_node = &graph[next_node_id];
             (*top_el).1 -= 1;
 
-            if !closed[next_node_id] || graph[next_node_id].is_large {
-                queue.push_front((next_node_id, 
-                    graph[next_node_id].connections.len()));
+            if next_node_id == start_id {
+                continue;
+            }
+
+            if !closed[next_node_id] || next_node.is_large || small_seal.is_none() {
+                queue.push_front((next_node_id, next_node.connections.len()));
+
+                if !next_node.is_large && small_seal.is_none() && closed[next_node_id] {
+                    small_seal = Some(queue.len())
+                }
 
                 closed[next_node_id] = true;
                 path.push(next_node_id);
