@@ -182,5 +182,5 @@ pub fn run(root_dir: &Path) {
         }
     }
 
-    print!("Num paths {}", num_paths);
+    println!("Num paths {}", num_paths);
 }
