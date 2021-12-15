@@ -84,6 +84,10 @@ pub fn read_list_of_csv_u32s(bytes: &Vec<u8>) -> Vec<u32> {
     
 }
 
+pub fn get_grid_idx(x: usize, y: usize, width: usize) -> usize {
+    x + (y * width) 
+}
+
 /// Returns the (x, y) coordinates represented by the idx for a grid
 /// of size (width, height). The grid is assumed to be stored row-major.
 pub fn get_grid_xy(idx: usize, width: usize, height: usize) -> (usize, usize) {
@@ -91,7 +95,6 @@ pub fn get_grid_xy(idx: usize, width: usize, height: usize) -> (usize, usize) {
     let x = idx - (y * width);
     (x, y)
 }
-
 
 /// Generates valid taps for a cross filter at a position (at idx) for a grid of size 
 /// (width, height). A tap is invalid if it falls outside the grid (edges and corners).

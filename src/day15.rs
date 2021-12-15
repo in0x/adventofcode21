@@ -31,7 +31,26 @@ pub fn run(root_dir: &Path) {
     let input_path = root_dir.join("day15_input.txt");
     let bytes = common::read_input_bytes(input_path.as_path());
     
-    let (grid, width, height) = common::parse_grid(&bytes);
+    let (grid, width, height) = {
+        let (grid, width, height) = common::parse_grid(&bytes);
+        let mut full_grid = Vec::new();
+        full_grid.reserve(grid.len() * 25);
+
+        for outer_iter in 0..5 {
+            for y in 0..height {
+                for inner_iter in 0..5 {
+                    for x in 0..width {
+                        let idx = common::get_grid_idx(x, y, width);
+                        let mut val = grid[idx] + inner_iter + outer_iter;
+                        if val > 9 { val = val - 9 }
+                        full_grid.push(val);
+                    }
+                }
+            }
+        }
+
+        (full_grid, width * 5, height * 5)
+    };
 
     fn get_cost(node: usize, graph: &Vec<u8>) -> usize {
         graph[node] as usize
