@@ -18,37 +18,6 @@ pub fn run(root_dir: &Path) {
         common::parse_grid(&bytes)
     };
 
-    let get_tap_coords = |idx: usize| -> [Option<usize>; 9] {
-        let (x, y) = {
-            let y = idx / width;
-            let x = idx - (y * width);
-            (x as i32, y as i32)
-        };
-
-        let mut coords: [Option<usize>; 9] = Default::default();
-        let mut coord_i = 0;
-
-        for d_x in [-1,0,1] {
-            let next_x = x + d_x;
-            if next_x < 0 || next_x >= width as i32 {
-                continue;
-            }
-            
-            for d_y in [-1,0,1] {
-                let next_y = y + d_y;
-                if next_y < 0 || next_y >= height as i32 {
-                    continue;
-                }
-
-                let tap = next_x as usize + (next_y as usize * width);
-                coords[coord_i] = Some(tap);
-                coord_i += 1;
-            }
-        }
-        
-        coords
-    };
-
     let mut num_flashes = 0;
     let mut step = 0;
     loop {
@@ -75,7 +44,7 @@ pub fn run(root_dir: &Path) {
                 grid[*idx] = 0;
                 num_flashes += 1;
 
-                let taps = get_tap_coords(*idx);
+                let taps = common::get_box_taps(*idx, width, height);
                 for tap in taps {
                     match tap {
                         Some(i) => {
