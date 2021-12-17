@@ -1,6 +1,7 @@
+use std::collections::HashSet;
 use std::path::Path;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct Vec2 {
     x: i32,
     y: i32,
@@ -36,17 +37,20 @@ pub fn run(_: &Path) {
     println!("Target min ({} {}) max ({} {})", target_min.x, target_min.y,
         target_max.x, target_max.y);
 
-    let start_x = {
-        let mut x = 0;
-        for i in 1..target_min.x {
-            let sum = i as f32 * ((1.0 + i as f32) / 2.0);
-            x = i;
-            if sum >= target_min.x as f32 {
-                break;
-            }
-        }
-        x
-    };
+    // let start_x = { // optimal x
+    //     let mut x = 0;
+    //     for i in 1..target_min.x {
+    //         let sum = i as f32 * ((1.0 + i as f32) / 2.0);
+    //         x = i;
+    //         if sum >= target_min.x as f32 {
+    //             break;
+    //         }
+    //     }
+    //     x
+    // };
+
+    let start_x = 1;
+    let end_x = target_max.x ;
 
     let mut max_y = i32::MIN;
     let mut max_vel = None;
@@ -54,8 +58,11 @@ pub fn run(_: &Path) {
     let l_y = target_min.y;
     let u_y = target_min.y.abs();
 
+    let mut hits: HashSet<Vec2> = HashSet::new();
+
+    for s_x in start_x..=(end_x + 5) {
     for s_y in l_y..u_y {
-        let initial_vel = Vec2::new(start_x, s_y);
+        let initial_vel = Vec2::new(s_x, s_y);
         let mut hit_vel = None;
 
         let mut vel = initial_vel;
@@ -108,7 +115,8 @@ pub fn run(_: &Path) {
         }
 
         match hit_vel {
-            Some(_) => {
+            Some(v) => {
+                hits.insert(v);
                 if peak > max_y {
                     max_y = peak;
                     max_vel = hit_vel;
@@ -117,6 +125,7 @@ pub fn run(_: &Path) {
             None => ()
         }
     } 
-
+    }
     println!("Max y {} at vel {} {}", max_y, max_vel.unwrap().x, max_vel.unwrap().y);
+    println!("Num distinct velocities {}", hits.len());
 }
