@@ -26,86 +26,78 @@ impl fmt::Debug for Digit {
     }
 }
 
-fn char_to_digit(c: char) -> Option<Digit> {
+#[derive(Clone, Copy, PartialEq)]
+enum ParseResult {
+    Value(Digit),
+    Comma,
+    Newline,
+}
+
+fn char_to_digit(c: char) -> ParseResult {
     match c {
-        '[' => Some(Digit::ScopeOpen),
-        ']' => Some(Digit::ScopeClose),
+        '[' => ParseResult::Value(Digit::ScopeOpen),
+        ']' => ParseResult::Value(Digit::ScopeClose),
         '0'..='9' => {
             let val = (c as u8) - ('0' as u8);
-            Some(Digit::Literal(val as u32))
+            ParseResult::Value(Digit::Literal(val as u32))
         },
-        ',' => None,
-        '\n' | '\r' => None, // TODO handle on full input    
+        ',' => ParseResult::Comma,
+        '\n' | '\r' => ParseResult::Newline,    
         t => panic!("Unexpected token \'{}\'", t),
     }
 }
 
+fn build_literal(digits: &mut Vec<u32>) -> u32 {
+    digits.reverse();
+
+    let mut literal = 0;
+    for i in 0..digits.len() {
+        literal += digits[i] * 10u32.pow(i as u32);
+    }
+    digits.clear();
+
+    literal
+}
+
 fn number_from_byte_slice(bytes: &[u8]) -> VecDeque<Digit> {
     let mut number: VecDeque<Digit> = VecDeque::new();
+    let mut literal_buf = Vec::new();
     for b in bytes {
         match char_to_digit(*b as char) {
-            Some(d) => number.push_back(d),
-            None => ()
+            ParseResult::Value(value) => {
+                match value {
+                    Digit::ScopeClose => {
+                        if !literal_buf.is_empty() {
+                            let literal = build_literal(&mut literal_buf);
+                            number.push_back(Digit::Literal(literal));
+                        }
+                        
+                        number.push_back(value)
+                    },
+                    Digit::ScopeOpen => number.push_back(value),
+                    Digit::Literal(x) => literal_buf.push(x), 
+                }
+            },
+            ParseResult::Comma => {
+                if !literal_buf.is_empty() {
+                    let literal = build_literal(&mut literal_buf);
+                    number.push_back(Digit::Literal(literal));
+                }
+            },
+            ParseResult::Newline => (), // TODO handle on full input
         }
     }
     number
 }
 
 fn number_from_str_slice(str: &str) -> VecDeque<Digit> {
-    let mut number: VecDeque<Digit> = VecDeque::new();
-    for c in str.chars() {
-        match char_to_digit(c) {
-            Some(d) => number.push_back(d),
-            None => ()
-        }
-    }
-    number
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum Action {
-    Explode(usize),
-    Split(usize),
-    None,
-}
-
-fn find_next_action(number: &VecDeque<Digit>) -> Option<Action> {
-    let mut scopes = 0;
-    
-    for i in 0..number.len() {
-        let next_action = match number[i] {
-            Digit::ScopeClose => {
-                scopes -= 1;
-                assert!(scopes >= 0);
-                Action::None   
-            },
-            Digit::ScopeOpen => {
-                scopes += 1;
-                if scopes > 4 {
-                    Action::Explode(i)
-                } else {
-                    Action::None
-                }
-            },
-            Digit::Literal(x) => if x > 9 {
-                // Action::Split(i) TODO handle
-                Action::None
-            } else {
-                Action::None
-            },
-        };
-
-        if next_action != Action::None {
-            return Some(next_action);
-        }
-    }
-
-    None
+    let bytes = str.chars().map(|c| c as u8).collect::<Vec<_>>();
+    number_from_byte_slice(&bytes)
 }
 
 fn explode_at(number: &mut VecDeque<Digit>, scope_open_idx: usize) -> VecDeque<Digit> {
     let mut exploded = VecDeque::new();
-    exploded.reserve(exploded.len());
+    exploded.reserve(number.len());
 
     let mut explode_to_left_idx = None;
 
@@ -181,8 +173,84 @@ fn explode_at(number: &mut VecDeque<Digit>, scope_open_idx: usize) -> VecDeque<D
     exploded
 }
 
-// fn split_at(number: &mut Vec<Digit>, scope_open_idx: usize) {
-// }
+#[inline(never)]
+fn split_at(number: &mut VecDeque<Digit>, split_digit_idx: usize) -> VecDeque<Digit> {
+    let mut split = VecDeque::new();
+    split.reserve(number.len());
+
+    for _ in 0..split_digit_idx { // Only go up to before the digit
+        match number.pop_front() {
+            Some(digit) => {
+                split.push_back(digit);
+            },
+            None => panic!(),
+        }
+    }
+
+    let split_literal = match number.pop_front() {
+        Some(digit) => {
+            match digit {
+                Digit::Literal(x) => x,
+                _ => panic!(),
+            }
+        },
+        None => panic!()
+    };
+
+    let left_val = split_literal / 2;
+    let right_val = ((split_literal as f32) / 2.0).round() as u32;
+
+    split.push_back(Digit::ScopeOpen);
+    split.push_back(Digit::Literal(left_val));
+    split.push_back(Digit::Literal(right_val));
+    split.push_back(Digit::ScopeClose);
+
+    while !number.is_empty() {
+        split.push_back(number.pop_front().unwrap());
+    }
+
+    split
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Action {
+    Explode(usize),
+    Split(usize),
+    None,
+}
+
+fn find_next_action(number: &VecDeque<Digit>) -> Option<Action> {
+    let mut scopes = 0;
+    
+    for i in 0..number.len() {
+        let next_action = match number[i] {
+            Digit::ScopeClose => {
+                scopes -= 1;
+                assert!(scopes >= 0);
+                Action::None   
+            },
+            Digit::ScopeOpen => {
+                scopes += 1;
+                if scopes > 4 {
+                    Action::Explode(i)
+                } else {
+                    Action::None
+                }
+            },
+            Digit::Literal(x) => if x > 9 {
+                Action::Split(i)
+            } else {
+                Action::None
+            },
+        };
+
+        if next_action != Action::None {
+            return Some(next_action);
+        }
+    }
+
+    None
+}
 
 fn reduce(mut number: VecDeque<Digit>) -> VecDeque<Digit> {
     let mut next_action = find_next_action(&number);
@@ -195,9 +263,10 @@ fn reduce(mut number: VecDeque<Digit>) -> VecDeque<Digit> {
             },
             Some(Action::Split(idx)) => {
                 // println!("Split at {}", idx);
+                number = split_at(&mut number, idx);
             },
-            // _ => println!("Finished"),
             _ => (),
+            // _ => println!("Finished"),
         }
 
         next_action = find_next_action(&number);
@@ -270,13 +339,13 @@ mod tests {
         check("[[6,[5,[4,[3,2]]]],1]", "[[6,[5,[7,0]]],3]");
     }
 
-    // #[test] // Commented out because the example on the page doesnt perform all actions
-    // fn explode4() {
-    //     check("[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]", "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]");
-    // }
-
     #[test]
     fn explode5() {
         check("[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]", "[[3,[2,[8,0]]],[9,[5,[7,0]]]]");
+    }
+
+    #[test]
+    fn split1() {
+        check("[[3,10],[1,[11,2]]]", "[[3,[5,5]],[1,[[5,6],2]]]");
     }
 }
