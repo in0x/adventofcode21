@@ -31,6 +31,7 @@ enum ParseResult {
     Value(Digit),
     Comma,
     Newline,
+    Ignore,
 }
 
 fn char_to_digit(c: char) -> ParseResult {
@@ -42,7 +43,8 @@ fn char_to_digit(c: char) -> ParseResult {
             ParseResult::Value(Digit::Literal(val as u32))
         },
         ',' => ParseResult::Comma,
-        '\n' | '\r' => ParseResult::Newline,    
+        '\n' | '\r' => ParseResult::Newline,
+        ' ' => ParseResult::Ignore,    
         t => panic!("Unexpected token \'{}\'", t),
     }
 }
@@ -59,9 +61,11 @@ fn build_literal(digits: &mut Vec<u32>) -> u32 {
     literal
 }
 
-fn number_from_byte_slice(bytes: &[u8]) -> VecDeque<Digit> {
-    let mut number: VecDeque<Digit> = VecDeque::new();
+fn numbers_from_byte_slice(bytes: &[u8]) -> Vec<VecDeque<Digit>> {
+    let mut all_numbers = Vec::new();
+    let mut number = VecDeque::new();
     let mut literal_buf = Vec::new();
+
     for b in bytes {
         match char_to_digit(*b as char) {
             ParseResult::Value(value) => {
@@ -84,15 +88,24 @@ fn number_from_byte_slice(bytes: &[u8]) -> VecDeque<Digit> {
                     number.push_back(Digit::Literal(literal));
                 }
             },
-            ParseResult::Newline => (), // TODO handle on full input
+            ParseResult::Newline => {
+                assert!(literal_buf.is_empty());
+                if !number.is_empty() {
+                    all_numbers.push(number);
+                    number = VecDeque::new();
+                }
+            },
+            ParseResult::Ignore => (),
         }
     }
-    number
+
+    all_numbers.push(number);
+    all_numbers
 }
 
-fn number_from_str_slice(str: &str) -> VecDeque<Digit> {
+fn number_from_str_slice(str: &str) -> Vec<VecDeque<Digit>> {
     let bytes = str.chars().map(|c| c as u8).collect::<Vec<_>>();
-    number_from_byte_slice(&bytes)
+    numbers_from_byte_slice(&bytes)
 }
 
 fn explode_at(number: &mut VecDeque<Digit>, scope_open_idx: usize) -> VecDeque<Digit> {
@@ -271,8 +284,8 @@ fn reduce(mut number: VecDeque<Digit>) -> VecDeque<Digit> {
 
         next_action = find_next_action(&number);
 
-        println!("Step:");
-        print_number(&number);
+        // println!("Afterwards:");
+        // print_number(&number);
     }
 
     number
@@ -280,10 +293,28 @@ fn reduce(mut number: VecDeque<Digit>) -> VecDeque<Digit> {
 
 
 fn print_number(number: &VecDeque<Digit>) {
-    for d in number {
-        print!("{} ", d);
+    for i in 0..number.len() {
+        print!("{}", number[i]);
+        
+        if i < (number.len() - 1) {
+            match (number[i], number[i+1]) {
+                (Digit::Literal(_), Digit::Literal(_)) => print!(","),
+                (Digit::ScopeClose, Digit::ScopeOpen) => print!(","),
+                _ => (),    
+            }
+        } 
     }
     println!();
+}
+
+fn add_numbers(into: &mut VecDeque<Digit>, from: &VecDeque<Digit>) {
+    into.push_front(Digit::ScopeOpen);
+
+    for digit in from {
+        into.push_back(*digit);
+    }
+
+    into.push_back(Digit::ScopeClose);
 }
 
 // TODO: remove Action::None, just use Option
@@ -294,13 +325,18 @@ pub fn run(root_dir: &Path) {
     // splitting happens in FILO order (splits may produce new actions
     // which get added to the top of the stack).
     
-    let mut  number = number_from_byte_slice(&bytes);
+    let numbers = numbers_from_byte_slice(&bytes);
 
-    print_number(&number);
+    let mut result: VecDeque<Digit> = numbers[0].clone();
+    result = reduce(result);
 
-    number = reduce(number);
-    
-    print_number(&number);
+    for number in &numbers[1..] {
+        add_numbers(&mut result, number);
+        result = reduce(result);
+        print_number(&result);
+    } 
+
+    print_number(&result);
 }
 
 #[cfg(test)]
@@ -311,17 +347,15 @@ mod tests {
         let from = super::number_from_str_slice(from_str);
         let to = super::number_from_str_slice(to_str);
 
-        print!("Test:\nFr: ");
-        print_number(&from);
-        print!("To: ");
-        print_number(&to);
+        let mut result = from[0].clone();
+        result = super::reduce(result);
+    
+        for number in &from[1..] {
+            super::add_numbers(&mut result, number);
+            result = super::reduce(result);
+        } 
 
-        let result = super::reduce(from);
-
-        print!("Re: ");
-        print_number(&result);
-
-        assert_eq!(to, result);
+        assert_eq!(to[0], result);
     }
 
     #[test]
@@ -347,5 +381,21 @@ mod tests {
     #[test]
     fn split1() {
         check("[[3,10],[1,[11,2]]]", "[[3,[5,5]],[1,[[5,6],2]]]");
+    }
+
+    #[test]
+    fn full1() {
+        check("[[[[4,3],4],4],[7,[[8,4],9]]]\n[1,1]", "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]");
+    }
+
+    #[test]
+    fn full2() {
+        check("[1,1]\n[2,2]\n[3,3]\n[4,4]\n[5,5]\n[6,6]", "[[[[5,0],[7,4]],[5,5]],[6,6]]");
+    }
+
+    #[test]
+    fn full3() {
+        check("[[[0,[4,5]],[0,0]],[[[4,5],[2,6]],[9,5]]]\n[7,[[[3,7],[4,3]],[[6,3],[8,8]]]]\n[[2,[[0,8],[3,4]]],[[[6,7],1],[7,[1,6]]]]\n[[[[2,4],7],[6,[0,5]]],[[[6,8],[2,8]],[[2,1],[4,5]]]]\n[7,[5,[[3,8],[1,4]]]]\n[[2,[2,2]],[8,[8,1]]]\n[2,9]\n[1,[[[9,3],9],[[9,0],[0,7]]]]\n[[[5,[7,4]],7],1]\n[[[[4,2],2],6],[8,7]]", 
+        "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]");
     }
 }
