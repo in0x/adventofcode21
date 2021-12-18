@@ -114,9 +114,6 @@ fn explode_at(number: &mut VecDeque<Digit>, scope_open_idx: usize) -> VecDeque<D
         match number.pop_front() {
             Some(digit) => {
                 match digit {
-                    // Digit::Literal(_) => if explode_to_left_idx.is_none() {
-                    //     explode_to_left_idx = Some(exploded.len());
-                    // },
                     Digit::Literal(_) => explode_to_left_idx = Some(exploded.len()),
                     _ => ()
                 }
@@ -153,7 +150,6 @@ fn explode_at(number: &mut VecDeque<Digit>, scope_open_idx: usize) -> VecDeque<D
                     Digit::Literal(_) => if explode_to_right_idx.is_none() {
                         explode_to_right_idx = Some(exploded.len());
                     },
-                    // Digit::Literal(_) => explode_to_right_idx = Some(exploded.len()),
                     _ => ()
                 }
                 exploded.push_back(digit);
@@ -221,47 +217,7 @@ fn split_at(number: &mut VecDeque<Digit>, split_digit_idx: usize) -> VecDeque<Di
     split
 }
 
-// #[derive(Clone, Copy, PartialEq)]
-// enum Action {
-//     Explode(usize),
-//     Split(usize),
-//     None,
-// }
-
-// fn find_next_action(number: &VecDeque<Digit>) -> Option<Action> {
-//     let mut scopes = 0;
-    
-//     for i in 0..number.len() {
-//         let next_action = match number[i] {
-//             Digit::ScopeClose => {
-//                 scopes -= 1;
-//                 assert!(scopes >= 0);
-//                 Action::None   
-//             },
-//             Digit::ScopeOpen => {
-//                 scopes += 1;
-//                 if scopes > 4 {
-//                     Action::Explode(i)
-//                 } else {
-//                     Action::None
-//                 }
-//             },
-//             Digit::Literal(x) => if x > 9 {
-//                 Action::Split(i)
-//             } else {
-//                 Action::None
-//             },
-//         };
-
-//         if next_action != Action::None {
-//             return Some(next_action);
-//         }
-//     }
-
-//     None
-// }
-
-// todo we can search all at once and then pick the preference
+// NOTE: we can search all at once and then pick the preference, to spend less time search
 fn find_next_explode(number: &VecDeque<Digit>) -> Option<usize> {
     let mut scopes = 0;
     
@@ -312,33 +268,10 @@ fn reduce(mut number: VecDeque<Digit>) -> VecDeque<Digit> {
                 }
             }
         }
-        // if next_explode.is_some() {
-        //     number = explode_at(&mut number, next_explode.unwrap());
-        // } else {
-        //     let next_split
-        // }
-
-        // match next_action {
-        //     Some(Action::Explode(idx)) => {
-        //         // println!("Explode at {}", idx);
-        //     },
-        //     Some(Action::Split(idx)) => {
-        //         // println!("Split at {}", idx);
-        //         number = split_at(&mut number, idx);
-        //     },
-        //     _ => (),
-        //     // _ => println!("Finished"),
-        // }
-
-        // next_action = find_next_action(&number);
-
-        // println!("Afterwards:");
-        // print_number(&number);
     }
 
     number
 }
-
 
 fn print_number(number: &VecDeque<Digit>) {
     for i in 0..number.len() {
@@ -365,13 +298,36 @@ fn add_numbers(into: &mut VecDeque<Digit>, from: &VecDeque<Digit>) {
     into.push_back(Digit::ScopeClose);
 }
 
-// TODO: remove Action::None, just use Option
+fn mag(number: &VecDeque<Digit>) -> u64 {
+    let mut stack: Vec<u64> = Vec::new(); // If only there was a built-in alloca vector...
+
+    for el in number.iter() {
+        match *el {
+            Digit::Literal(x) => stack.push(x as u64),
+            Digit::ScopeClose => {
+                match (stack.pop(), stack.pop()) {
+                    (Some(rhs), Some(lhs)) => { // Stack is LIFO so the order of args needs to switch
+                        let val = lhs * 3 + rhs * 2;
+                        stack.push(val);
+                    },
+                    (Some(lone), None) => {
+                        stack.push(lone);
+                    }
+                    _ => panic!("Unexpected mag stack state"),
+                }
+            }
+            _ => ()
+        }
+    }
+
+    assert!(stack.len() == 1);
+    stack[0]
+}
+
+
 pub fn run(root_dir: &Path) {
     let input_path = root_dir.join("day18_input.txt");
     let bytes = common::read_input_bytes(input_path.as_path());
-    
-    // splitting happens in FILO order (splits may produce new actions
-    // which get added to the top of the stack).
     
     let numbers = numbers_from_byte_slice(&bytes);
 
@@ -381,10 +337,35 @@ pub fn run(root_dir: &Path) {
     for number in &numbers[1..] {
         add_numbers(&mut result, number);
         result = reduce(result);
-        print_number(&result);
     } 
 
     print_number(&result);
+    println!("Magnitude: {}", mag(&result));
+
+    let mut max_mag = 0;
+    for outer in 0..numbers.len() {
+        for inner in (outer + 1)..numbers.len() {
+            if inner == outer {
+                continue;
+            }
+
+            {
+                let mut result = numbers[outer].clone(); 
+                add_numbers(&mut result, &numbers[inner]);
+                result = reduce(result);
+                max_mag = u64::max(max_mag, mag(&result));
+            }
+
+            {
+                let mut result = numbers[inner].clone(); 
+                add_numbers(&mut result, &numbers[outer]);
+                result = reduce(result);
+                max_mag = u64::max(max_mag, mag(&result));
+            }
+        }
+    }
+
+    println!("Max possible mag of two adds {}", max_mag);
 }
 
 #[cfg(test)]
@@ -450,5 +431,56 @@ mod tests {
     fn full3() {
         check("[[[0,[4,5]],[0,0]],[[[4,5],[2,6]],[9,5]]]\n[7,[[[3,7],[4,3]],[[6,3],[8,8]]]]\n[[2,[[0,8],[3,4]]],[[[6,7],1],[7,[1,6]]]]\n[[[[2,4],7],[6,[0,5]]],[[[6,8],[2,8]],[[2,1],[4,5]]]]\n[7,[5,[[3,8],[1,4]]]]\n[[2,[2,2]],[8,[8,1]]]\n[2,9]\n[1,[[[9,3],9],[[9,0],[0,7]]]]\n[[[5,[7,4]],7],1]\n[[[[4,2],2],6],[8,7]]", 
         "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]");
+    }
+
+    #[test]
+    fn full4() {
+        check("[[[0,[5,8]],[[1,7],[9,6]]],[[4,[1,2]],[[1,4],2]]]
+        [[[5,[2,8]],4],[5,[[9,9],0]]]
+        [6,[[[6,2],[5,6]],[[7,6],[4,7]]]]
+        [[[6,[0,7]],[0,9]],[4,[9,[9,0]]]]
+        [[[7,[6,4]],[3,[1,3]]],[[[5,5],1],9]]
+        [[6,[[7,3],[3,2]]],[[[3,8],[5,7]],4]]
+        [[[[5,4],[7,7]],8],[[8,3],8]]
+        [[9,3],[[9,9],[6,[4,9]]]]
+        [[2,[[7,7],7]],[[5,8],[[9,3],[0,2]]]]
+        [[[[5,2],5],[8,[3,7]]],[[5,[7,5]],[4,4]]]",
+        "[[[[6,6],[7,6]],[[7,7],[7,0]]],[[[7,7],[7,7]],[[7,8],[9,9]]]]");
+    }
+
+    #[test]
+    fn test_mag1() {
+        let number = &number_from_str_slice("[[9,1],[1,9]]")[0];
+        assert_eq!(129, super::mag(number));
+    }
+
+    #[test]
+    fn test_mag2() {
+        let number = &number_from_str_slice("[[[[0,7],4],[[7,8],[6,0]]],[8,1]]")[0];
+        assert_eq!(1384, super::mag(number));
+    }
+
+    #[test]
+    fn test_mag3() {
+        let number = &number_from_str_slice("[[[[1,1],[2,2]],[3,3]],[4,4]]")[0];
+        assert_eq!(445, super::mag(number));
+    }
+
+    #[test]
+    fn test_mag4() {
+        let number = &number_from_str_slice("[[[[3,0],[5,3]],[4,4]],[5,5]]")[0];
+        assert_eq!(791, super::mag(number));
+    }
+
+    #[test]
+    fn test_mag5() {
+        let number = &number_from_str_slice("[[[[5,0],[7,4]],[5,5]],[6,6]]")[0];
+        assert_eq!(1137, super::mag(number));
+    }
+
+    #[test]
+    fn test_mag6() {
+        let number = &number_from_str_slice("[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]")[0];
+        assert_eq!(3488, super::mag(number));
     }
 }
