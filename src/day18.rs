@@ -103,11 +103,7 @@ fn numbers_from_byte_slice(bytes: &[u8]) -> Vec<VecDeque<Digit>> {
     all_numbers
 }
 
-fn number_from_str_slice(str: &str) -> Vec<VecDeque<Digit>> {
-    let bytes = str.chars().map(|c| c as u8).collect::<Vec<_>>();
-    numbers_from_byte_slice(&bytes)
-}
-
+#[must_use]
 fn explode_at(number: &mut VecDeque<Digit>, scope_open_idx: usize) -> VecDeque<Digit> {
     let mut exploded = VecDeque::new();
     exploded.reserve(number.len());
@@ -186,7 +182,7 @@ fn explode_at(number: &mut VecDeque<Digit>, scope_open_idx: usize) -> VecDeque<D
     exploded
 }
 
-#[inline(never)]
+#[must_use]
 fn split_at(number: &mut VecDeque<Digit>, split_digit_idx: usize) -> VecDeque<Digit> {
     let mut split = VecDeque::new();
     split.reserve(number.len());
@@ -225,64 +221,116 @@ fn split_at(number: &mut VecDeque<Digit>, split_digit_idx: usize) -> VecDeque<Di
     split
 }
 
-#[derive(Clone, Copy, PartialEq)]
-enum Action {
-    Explode(usize),
-    Split(usize),
-    None,
-}
+// #[derive(Clone, Copy, PartialEq)]
+// enum Action {
+//     Explode(usize),
+//     Split(usize),
+//     None,
+// }
 
-fn find_next_action(number: &VecDeque<Digit>) -> Option<Action> {
+// fn find_next_action(number: &VecDeque<Digit>) -> Option<Action> {
+//     let mut scopes = 0;
+    
+//     for i in 0..number.len() {
+//         let next_action = match number[i] {
+//             Digit::ScopeClose => {
+//                 scopes -= 1;
+//                 assert!(scopes >= 0);
+//                 Action::None   
+//             },
+//             Digit::ScopeOpen => {
+//                 scopes += 1;
+//                 if scopes > 4 {
+//                     Action::Explode(i)
+//                 } else {
+//                     Action::None
+//                 }
+//             },
+//             Digit::Literal(x) => if x > 9 {
+//                 Action::Split(i)
+//             } else {
+//                 Action::None
+//             },
+//         };
+
+//         if next_action != Action::None {
+//             return Some(next_action);
+//         }
+//     }
+
+//     None
+// }
+
+// todo we can search all at once and then pick the preference
+fn find_next_explode(number: &VecDeque<Digit>) -> Option<usize> {
     let mut scopes = 0;
     
     for i in 0..number.len() {
-        let next_action = match number[i] {
-            Digit::ScopeClose => {
-                scopes -= 1;
-                assert!(scopes >= 0);
-                Action::None   
-            },
+        match number[i] {
             Digit::ScopeOpen => {
                 scopes += 1;
                 if scopes > 4 {
-                    Action::Explode(i)
-                } else {
-                    Action::None
+                    return Some(i);
                 }
+            }
+            Digit::ScopeClose => {
+                scopes -= 1;
+                assert!(scopes >= 0);
             },
-            Digit::Literal(x) => if x > 9 {
-                Action::Split(i)
-            } else {
-                Action::None
-            },
+            _ => (),
         };
+    }
 
-        if next_action != Action::None {
-            return Some(next_action);
-        }
+    None
+}
+
+fn find_next_split(number: &VecDeque<Digit>) -> Option<usize> {        
+    for i in 0..number.len() {
+        match number[i] {
+            Digit::Literal(x) => if x > 9 {
+                return Some(i);
+            },
+            _ => (),
+        };
     }
 
     None
 }
 
 fn reduce(mut number: VecDeque<Digit>) -> VecDeque<Digit> {
-    let mut next_action = find_next_action(&number);
-
-    while next_action.is_some() {
-        match next_action {
-            Some(Action::Explode(idx)) => {
-                // println!("Explode at {}", idx);
-                number = explode_at(&mut number, idx);
+    loop {
+        match find_next_explode(&number) {
+            Some(explode_idx) => {
+                number = explode_at(&mut number, explode_idx);
             },
-            Some(Action::Split(idx)) => {
-                // println!("Split at {}", idx);
-                number = split_at(&mut number, idx);
-            },
-            _ => (),
-            // _ => println!("Finished"),
+            None => {
+                match find_next_split(&number) {
+                    Some(split_idx) => {
+                        number = split_at(&mut number, split_idx);
+                    },
+                    None => break,
+                }
+            }
         }
+        // if next_explode.is_some() {
+        //     number = explode_at(&mut number, next_explode.unwrap());
+        // } else {
+        //     let next_split
+        // }
 
-        next_action = find_next_action(&number);
+        // match next_action {
+        //     Some(Action::Explode(idx)) => {
+        //         // println!("Explode at {}", idx);
+        //     },
+        //     Some(Action::Split(idx)) => {
+        //         // println!("Split at {}", idx);
+        //         number = split_at(&mut number, idx);
+        //     },
+        //     _ => (),
+        //     // _ => println!("Finished"),
+        // }
+
+        // next_action = find_next_action(&number);
 
         // println!("Afterwards:");
         // print_number(&number);
@@ -341,11 +389,16 @@ pub fn run(root_dir: &Path) {
 
 #[cfg(test)]
 mod tests {
-    use crate::day18::print_number;
+    use std::collections::VecDeque;
 
+    fn number_from_str_slice(str: &str) -> Vec<VecDeque<super::Digit>> {
+        let bytes = str.chars().map(|c| c as u8).collect::<Vec<_>>();
+        super::numbers_from_byte_slice(&bytes)
+    }
+    
     fn check(from_str: &str, to_str: &str) {
-        let from = super::number_from_str_slice(from_str);
-        let to = super::number_from_str_slice(to_str);
+        let from = number_from_str_slice(from_str);
+        let to = number_from_str_slice(to_str);
 
         let mut result = from[0].clone();
         result = super::reduce(result);
