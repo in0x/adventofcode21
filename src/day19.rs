@@ -93,6 +93,10 @@ impl Vec3f {
     fn scale(&self, scl: f32) -> Vec3f {
         Vec3f {x: self.x * scl, y: self.y * scl, z: self.z * scl}
     }
+
+    fn sub(lhs: Vec3f, rhs: Vec3f) -> Vec3f {
+        Vec3f {x: lhs.x - rhs.x, y: lhs.y - rhs.y, z: lhs.z - rhs.z}
+    }
 }
 
 impl fmt::Display for Vec3f {
@@ -101,9 +105,16 @@ impl fmt::Display for Vec3f {
     }
 }
 
-#[derive(Clone, Copy,Default)]
+#[derive(Clone, Copy)]
 struct Mtx3x3 {
     rows: [[f32;3];3]
+}
+
+
+impl Default for Mtx3x3 {
+    fn default() -> Mtx3x3 {
+        Mtx3x3 { rows: [[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]] }
+    }
 }
 
 impl Mtx3x3 {
@@ -149,6 +160,26 @@ impl Mtx3x3 {
         (self.rows[0][0] * vec.x + self.rows[0][1] * vec.y + self.rows[0][2] * vec.z,
          self.rows[1][0] * vec.x + self.rows[1][1] * vec.y + self.rows[1][2] * vec.z,
          self.rows[2][0] * vec.x + self.rows[2][1] * vec.y + self.rows[2][2] * vec.z)
+    }
+
+    fn identity() -> Mtx3x3 {
+        let mut id = Mtx3x3::default();
+        id.rows[0][0] = 1.0;
+        id.rows[1][1] = 1.0;
+        id.rows[2][2] = 1.0;
+        id
+    }
+
+    fn mul(&self, rhv: &Mtx3x3) -> Mtx3x3 {
+        let mut dst = Mtx3x3::default();
+        for row in 0..3 {
+			for col in 0..3 {
+				dst.rows[row][col] = self.rows[row][0] * rhv.rows[0][col] 
+                                   + self.rows[row][1] * rhv.rows[1][col] 
+                                   + self.rows[row][2] * rhv.rows[2][col];
+			}
+		}
+        dst
     }
 }
 
@@ -239,69 +270,151 @@ pub fn run(root_dir: &Path) {
     // Actually now, I think we need to flip into the same orientation to get the same distances
     // maybe try it just to see
 
-    let mut unique_points: HashSet<Vec3> = HashSet::new();
-
     let identity_tf_idx = orientations.iter().position(|o| {
         o[0].0 == 0 && o[0].1 == 1 &&
         o[1].0 == 1 && o[1].1 == 1 &&
         o[2].0 == 2 && o[2].1 == 1
     }).unwrap();
 
-    // Pair of translation and orientation to parent space
-    let mut transform_to_parent: Vec<(Vec3, usize)> = Vec::new();
-    let mut transforms_found = Vec::new();
-    transforms_found.resize(probes.len(), false);
-    transform_to_parent.resize(probes.len(), (Vec3::zero(), identity_tf_idx));
+    // Pair of overlaps_with and orientation_to_idx
+    let mut transform_to_parent: Vec<Option<(usize, usize)>> = Vec::new();
+    transform_to_parent.resize(probes.len(), None);
 
-    transforms_found[0] = true;
+    transform_to_parent[0] = Some((0, 0));
 
-    // while transforms_found.iter().any(|f| !f) {
-    //     for prober_i_outer in 0..probes.len() {
-    //         if !transforms_found[prober_i_outer] {
-    //             continue;
-    //         } 
+    for prober_i_outer in 0..probes.len() {
+        if transform_to_parent.iter().all(|o| o.is_some()) {
+            break;
+        }
+        
+        let outer_points = &probes[prober_i_outer];
+        let outer_distances = calc_distances_vecs_for_points(outer_points);
 
-    //         let outer_points = &probes[prober_i_outer];
-    //         let outer_distances = calc_distances_vecs_for_points(outer_points);
+        for probe_i_inner in 0..probes.len() {
+            if probe_i_inner == prober_i_outer {
+                continue;
+            }
 
-    //         for prob_i_inner in 0..probes.len() {
-    //             if prob_i_inner == prober_i_outer {
-    //                 continue;
-    //             }
+            if transform_to_parent[probe_i_inner].is_some() {
+                continue;
+            }
 
-    //             if transforms_found[prob_i_inner] {
-    //                 continue;
-    //             }
+            'orient: for (tf_idx, tf) in orientations.iter().enumerate() {
+                let inner_points = reorient_points(&probes[probe_i_inner], tf);
+                let inner_distances = calc_distances_vecs_for_points(&inner_points);
 
-    //             'orient: for (tf_idx, tf) in orientations.iter().enumerate() {
-    //                 let inner_points = reorient_points(&probes[prob_i_inner], tf);
-    //                 let inner_distances = calc_distances_vecs_for_points(&inner_points);
-    
-    //                 let mut shared_points = HashSet::new();
-    
-    //                 for outer_el in &outer_distances {
-    //                     match inner_distances.iter().find(|inner_el| outer_el.0 == inner_el.0) {
-    //                         Some(inner_el) => {
-    //                             shared_points.insert(inner_points[inner_el.1]);
-    //                             shared_points.insert(inner_points[inner_el.2]);
-    //                         },
-    //                         None => ()
-    //                     }
-    //                 }
-    
-    //                 if shared_points.len() >= 12 {
-    //                     for p in &shared_points {
-    //                         // println!("Point: {} {} {}", p.x, p.y, p.z);
-    //                         unique_points.insert(*p);   
-    //                     }
+                let mut shared_points = HashSet::new();
 
-    //                     // println!("Overlap with {} and {}", prober_i_outer, prob_i_inner);
-    //                     // break 'orient;
-    //                 }
-    //             }
-    //         }
-    //     }
+                'dists: for outer_el in &outer_distances {
+                    match inner_distances.iter().find(|inner_el| outer_el.0 == inner_el.0) {
+                        Some(inner_el) => {
+                            shared_points.insert(inner_points[inner_el.1]);
+                            shared_points.insert(inner_points[inner_el.2]);
+
+                            if shared_points.len() >= 12 {
+                                break 'dists;
+                            }
+                        },
+                        None => ()
+                    }
+                }
+
+                if shared_points.len() >= 12 {
+                    transform_to_parent[probe_i_inner] = Some((prober_i_outer, tf_idx));
+                    break 'orient;
+                }
+            }
+        }
+    }
+
+    assert!(transform_to_parent.iter().all(|o| o.is_some()));
+
+    // for i in 0..transform_to_parent.len() {
+    //     let tf = transform_to_parent[i].unwrap();
+    //     println!("{} to {} via {}", i, tf.0, tf.1);
     // }
+
+    let mut unique_points: HashSet<Vec3> = HashSet::new();
+
+    // let mut to_do = Vec::new();
+    // to_do.resize(probes.len(), false);
+
+    fn make_mtx(tf: &[(usize, i32)]) -> Mtx3x3 {
+        let axes = [
+            Vec3f::new(1.0, 0.0, 0.0),
+            Vec3f::new(0.0, 1.0, 0.0),
+            Vec3f::new(0.0, 0.0, 1.0),
+        ];
+        
+        let x_axis = {
+            axes[tf[0].0].scale(tf[0].1 as f32)
+        };
+
+        let y_axis = {
+            axes[tf[1].0].scale(tf[1].1 as f32)
+        };
+
+        // should this be cross?
+        let z_axis = {
+            axes[tf[2].0].scale(tf[2].1 as f32)
+        };
+
+        let mut basis_mtx = Mtx3x3::default();
+        basis_mtx.rows[0][0] = x_axis.x; 
+        basis_mtx.rows[1][0] = x_axis.y; 
+        basis_mtx.rows[2][0] = x_axis.z; 
+
+        basis_mtx.rows[0][1] = y_axis.x; 
+        basis_mtx.rows[1][1] = y_axis.y; 
+        basis_mtx.rows[2][1] = y_axis.z; 
+
+        basis_mtx.rows[0][2] = z_axis.x; 
+        basis_mtx.rows[1][2] = z_axis.y; 
+        basis_mtx.rows[2][2] = z_axis.z; 
+
+        basis_mtx.inverse()
+    }
+
+    for p in &probes[0] {
+        unique_points.insert(*p);
+    }
+
+    for p_i in 1..probes.len() {
+        let (mut parent_id, mut tf_to) = transform_to_parent[p_i].unwrap();
+        let mut tf_chain = Vec::new();
+        tf_chain.push(tf_to);
+
+        while parent_id != 0 {
+            match transform_to_parent[parent_id] {
+                Some((p, t)) => {
+                    parent_id = p;
+                    tf_to = t;
+                },
+                None => panic!(),
+            }
+
+            tf_chain.push(tf_to);
+        }
+
+        for point in &probes[p_i] {
+            let vf = Vec3f::new(point.x as f32, point.y as f32, point.z as f32);
+            let abs_f = tf.transform(vf);
+
+            println!("abs: {}", abs_f);
+            // println!("diff: {}", Vec3f::sub(vf, abxs_f));
+            // unique_points.insert(Vec3::new(abs_f.x as i32, abs_f.y as i32, abs_f.z as i32));
+        }
+
+        panic!();
+
+        // println!("Done");
+        // let mut tf = make_mtx(&orientations[transform_to_parent[p_i].unwrap().0]);
+
+    }
+
+    println!("Unique points {}", unique_points.len());
+
+    return;
 
     for prober_i_outer in 0..probes.len() {
         let outer_points = &probes[prober_i_outer];
@@ -322,34 +435,6 @@ pub fn run(root_dir: &Path) {
                 for outer_el in &outer_distances {
                     match inner_distances.iter().find(|inner_el| outer_el.0 == inner_el.0) {
                         Some(inner_el) => {
-
-                            // let translate =
-                            // if Vec3::sub(outer_points[outer_el.1], inner_points[inner_el.1]) == 
-                            //    Vec3::sub(outer_points[outer_el.2], inner_points[inner_el.2]) {
-
-                            //     Vec3::sub(outer_points[outer_el.1], inner_points[inner_el.1])
-                            // } else 
-                            // if Vec3::sub(outer_points[outer_el.2], inner_points[inner_el.1]) == 
-                            //    Vec3::sub(outer_points[outer_el.1], inner_points[inner_el.2]) {
-                                
-                            //     Vec3::sub(outer_points[outer_el.2], inner_points[inner_el.1])
-                            // } else {
-                            //     panic!();
-                            // };
-
-                            // let hh = Vec3::sub(inner_points[inner_el.1], translate);
-                            // let pp = Vec3::sub(inner_points[inner_el.2], translate);
-                            // println!("{} {} {}", hh.x, hh.y, hh.z);
-                            // println!("{} {} {}", pp.x, pp.y, pp.z);
-
-                            // println!("{} {} tf {} {} {}",prober_i_outer, prob_i_inner, translate.x, translate.y, translate.z);
-
-                            // let rel_1 = Vec3::add(inner_points[inner_el.1], translate);
-                            // let rel_2 = Vec3::add(inner_points[inner_el.2], translate);
-
-                            // shared_points.insert(rel_1);
-                            // shared_points.insert(rel_2);
-
                             shared_points.insert(inner_points[inner_el.1]);
                             shared_points.insert(inner_points[inner_el.2]);
                         },
@@ -406,7 +491,7 @@ pub fn run(root_dir: &Path) {
                         // println!("Point: {} {} {}", p.x, p.y, p.z);
                         // unique_points.insert(*p);   
                     }
-                    panic!();
+                    // panic!();
                     // break 'orient;
                 }
             }
