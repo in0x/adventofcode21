@@ -39,13 +39,15 @@ pub fn build_u32(digits: &Vec<u8>) -> u32 {
 
 /// Returns a pair of the parsed number and the new cursor. The cursor
 /// will sit at the first position past the parsed number.
-pub fn parse_num(bytes: &Vec<u8>, token_buf: &mut Vec<u8>, mut cursor: usize) -> (Option<u32>, usize) {
+pub fn parse_num(bytes: &Vec<u8>, token_buf: &mut Vec<u8>, mut cursor: usize) -> (Option<i32>, usize) {
+    let mut is_neg = false; 
     while cursor < bytes.len() {
         match bytes[cursor] as char {
             '0'..='9' => {
                 let digit_val = bytes[cursor] - ('0' as u8);
                 token_buf.push(digit_val);    
             },
+            '-' => is_neg = true,
             _ => break,
         }
 
@@ -53,7 +55,11 @@ pub fn parse_num(bytes: &Vec<u8>, token_buf: &mut Vec<u8>, mut cursor: usize) ->
     }
 
     if token_buf.len() > 0 {
-        let num = build_u32(token_buf);
+        let mut num = build_u32(token_buf) as i32;
+        if is_neg {
+            num *= -1;
+        }
+
         token_buf.clear();
         (Some(num), cursor)
     } else {
@@ -61,9 +67,9 @@ pub fn parse_num(bytes: &Vec<u8>, token_buf: &mut Vec<u8>, mut cursor: usize) ->
     }
 }
 
-pub fn read_list_of_csv_u32s(bytes: &Vec<u8>) -> Vec<u32> {
+pub fn read_list_of_csv_i32s(bytes: &Vec<u8>) -> Vec<i32> {
     let mut cursor = 0;    
-    let mut values: Vec<u32> = Vec::new();
+    let mut values = Vec::new();
     let mut token_buf = Vec::new();
     token_buf.reserve(32);
 
@@ -83,6 +89,11 @@ pub fn read_list_of_csv_u32s(bytes: &Vec<u8>) -> Vec<u32> {
     values
     
 }
+
+pub fn read_list_of_csv_u32s(bytes: &Vec<u8>) -> Vec<u32> {
+    read_list_of_csv_i32s(bytes).into_iter().map(|i| i as u32).collect()
+}
+
 
 pub fn get_grid_idx(x: usize, y: usize, width: usize) -> usize {
     x + (y * width) 

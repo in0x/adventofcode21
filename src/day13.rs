@@ -30,7 +30,7 @@ pub fn run(root_dir: &Path) {
 
         let mut cursor = 0;    
         loop {
-            let x = match common::parse_num(&bytes, &mut token_buf, cursor) {
+            let ix = match common::parse_num(&bytes, &mut token_buf, cursor) {
                 (Some(val), new_cursor) => {
                     cursor = new_cursor;
                     val
@@ -40,7 +40,7 @@ pub fn run(root_dir: &Path) {
 
             cursor += 1;
 
-            let y = match common::parse_num(&bytes, &mut token_buf, cursor) {
+            let iy = match common::parse_num(&bytes, &mut token_buf, cursor) {
                 (Some(val), new_cursor) => {
                     cursor = new_cursor;
                     val
@@ -48,7 +48,7 @@ pub fn run(root_dir: &Path) {
                 (None, _) => panic!(),
             };
 
-            points.push(Point2D {x, y});
+            points.push(Point2D {x: ix as u32, y: iy as u32});
 
             while !bytes[cursor].is_ascii_alphanumeric() {
                 cursor += 1;
@@ -80,7 +80,7 @@ pub fn run(root_dir: &Path) {
 
             cursor += 2; // skip "x="
 
-            let val = match common::parse_num(&bytes, &mut token_buf, cursor) {
+            let ival = match common::parse_num(&bytes, &mut token_buf, cursor) {
                 (Some(val), new_cursor) => {
                     cursor = new_cursor;
                     val
@@ -88,7 +88,7 @@ pub fn run(root_dir: &Path) {
                 (None, _) => panic!(),
             };
 
-            folds.push(Fold { dir, val });
+            folds.push(Fold { dir, val: ival as u32 });
         }
 
         (points, folds)
