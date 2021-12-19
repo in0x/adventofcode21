@@ -1,5 +1,6 @@
 use super::common;
 use core::num;
+use std::hash::Hash;
 use std::{path::Path, io::BufRead};
 use std::collections::HashSet;
 
@@ -17,6 +18,14 @@ impl Vec3 {
 
     fn zero() -> Vec3 {
         Vec3 {x: 0, y: 0, z: 0}
+    }
+
+    fn add(lhs: Vec3, rhs: Vec3) -> Vec3 {
+        Vec3::new(
+            lhs.x + rhs.x,
+            lhs.y + rhs.y,
+            lhs.z + rhs.z
+        )
     }
 
     fn sub(lhs: Vec3, rhs: Vec3) -> Vec3 {
@@ -62,7 +71,8 @@ impl Vec3 {
     }
 }
 
-fn calc_distances_vecs_for_points(points: &[Vec3]) -> Vec<Vec3> {
+// Each element is a triple of distance and the indicies of the two points involved.
+fn calc_distances_vecs_for_points(points: &[Vec3]) -> Vec<(Vec3, usize, usize)> {
     let mut distances = Vec::new(); 
     let len = points.len();
 
@@ -70,9 +80,9 @@ fn calc_distances_vecs_for_points(points: &[Vec3]) -> Vec<Vec3> {
         for j in (i+1)..len {
             let dst = Vec3::sub(points[i], points[j]);
             if dst.x > 0 { // flip the distances into a consistent
-                distances.push(dst); // direction for easier compares
+                distances.push((dst, i, j)); // direction for easier compares
             } else {
-                distances.push(Vec3::scale(dst, -1));
+                distances.push((Vec3::scale(dst, -1), i, j));
             }
         }
     }
@@ -107,88 +117,168 @@ pub fn run(root_dir: &Path) {
         probes
     };
 
-    let mut permuts: Vec<Vec<Vec3>> = Vec::new(); 
-
-    for forward in 0..6 {
-        let fwd_idx = forward % 3;
-        let fwd_flip = if (forward % 2) == 0 { 1 } else { -1 };
+    // for forward in 0..6 {
+    //     let fwd_idx = forward % 3;
+    //     let fwd_flip = if (forward % 2) == 0 { 1 } else { -1 };
         
-        for up in 1..=2 {
-            let up_idx = (fwd_idx + up) % 3;
-            let r_idx = 3 - fwd_idx - up_idx;
+    //     for up in 1..=2 {
+    //         let up_idx = (fwd_idx + up) % 3;
+    //         let r_idx = 3 - fwd_idx - up_idx;
                 
-            let mut up_set = Vec::new();
-            let mut down_set = Vec::new();
+    //         let mut up_set = Vec::new();
+    //         let mut down_set = Vec::new();
     
-            for location in &probes[1] {
-                up_set.push(Vec3::new(
-                    location.idx(fwd_idx) * fwd_flip,
-                    location.idx(up_idx),
-                    location.idx(r_idx)
-                ));
+    //         for location in &probes[1] {
+    //             up_set.push(Vec3::new(
+    //                 location.idx(fwd_idx) * fwd_flip,
+    //                 location.idx(up_idx),
+    //                 location.idx(r_idx)
+    //             ));
 
-                down_set.push(Vec3::new(
-                    location.idx(fwd_idx) * fwd_flip,
-                    -location.idx(up_idx), // Up negated
-                    location.idx(r_idx)
-                ));
+    //             down_set.push(Vec3::new(
+    //                 location.idx(fwd_idx) * fwd_flip,
+    //                 -location.idx(up_idx), // Up negated
+    //                 location.idx(r_idx)
+    //             ));
  
-            }
+    //         }
             
-            permuts.push(up_set);
-            permuts.push(down_set);
+    //         permuts.push(up_set);
+    //         permuts.push(down_set);
+    //     }
+    // }
+
+
+    let orientations = {
+        let mut orientations: Vec<[(usize, i32);3]> = Vec::new();
+        
+        for forward in 0..6 {
+            let fwd_idx = forward % 3;
+            let fwd_flip = if (forward % 2) == 0 { 1 } else { -1 };
+                
+            for up in 1..=2 {
+                let up_idx = (fwd_idx + up) % 3;
+                let r_idx = 3 - fwd_idx - up_idx;
+
+                orientations.push([
+                    (fwd_idx, fwd_flip),
+                    (up_idx, 1),
+                    (r_idx, 1)
+                ]);
+
+                orientations.push([
+                    (fwd_idx, fwd_flip),
+                    (up_idx, -1), // Up negated
+                    (r_idx, 1)
+                ]);
+            }
         }
+        orientations
+    };
+
+    fn reorient_points(points: &Vec<Vec3>, mapping: &[(usize, i32);3]) -> Vec<Vec3> {
+        points.iter().map(|p| {
+            Vec3::new(p.idx(mapping[0].0) * mapping[0].1,
+                      p.idx(mapping[1].0) * mapping[1].1,
+                      p.idx(mapping[2].0) * mapping[2].1)
+        })
+        .collect::<Vec<_>>()
     }
 
-    let base_distances = calc_distances_vecs_for_points(&probes[0]);
+    // let base_distances = calc_distances_vecs_for_points(&probes[0]);
 
-    for (idx, permutation) in permuts.iter().enumerate() {
-        let permut_distances = calc_distances_vecs_for_points(permutation);
-        let mut shared_points: HashSet<Vec3> = HashSet::new();
-        let mut num_hits = 0;
+    // TODO: maybe we can accumulate over different orientations?
+    // Actually now, I think we need to flip into the same orientation to get the same distances
+    // maybe try it just to see
 
-        'inner: for (dst_idx, dst) in base_distances.iter().enumerate() {
-            if permut_distances.contains(dst) {
-                {
-                    let mut pi = 0;
-                    'search: for i in 0..probes[0].len() {
-                        for j in (i+1)..probes[0].len() {
-                            if pi == dst_idx {
-                                shared_points.insert(probes[0][i]);
-                                shared_points.insert(probes[0][j]);
-                                // println!("Shared Points: ({}, {}, {}) -> ({}, {}, {})",
-                                //     probes[0][i].x, probes[0][i].y, probes[0][i].z, 
-                                //     probes[0][j].y, probes[0][j].y, probes[0][j].z);
-                                break 'search;
-                            }
-                            pi += 1;
-                        }
+    // todo we can calculate axes permutations one at a time until we find an overlapping one
+
+    let mut unique_points: HashSet<Vec3> = HashSet::new();
+
+    for prober_i_outer in 0..probes.len() {
+        let outer_points = &probes[prober_i_outer];
+        let outer_distances = calc_distances_vecs_for_points(outer_points);
+
+        for prob_i_inner in 0..probes.len() {
+            if prob_i_inner == prober_i_outer {
+                continue;
+            }
+
+            'orient: for tf in &orientations {
+                let inner_points = reorient_points(&probes[prob_i_inner], tf);
+                let inner_distances = calc_distances_vecs_for_points(&inner_points);
+
+                let mut shared_points = HashSet::new();
+                let mut shared_indices = Vec::new();
+
+                let mut inner_shared = Vec::new();
+
+                for outer_el in &outer_distances {
+                    match inner_distances.iter().find(|inner_el| outer_el.0 == inner_el.0) {
+                        Some(inner_el) => {
+                            shared_points.insert(outer_points[outer_el.1]);
+                            shared_points.insert(outer_points[outer_el.2]); // TODO only for testing
+                            // if !(Vec3::sub(outer_points[outer_el.1], inner_points[inner_el.1]) ==
+                            //      Vec3::sub(outer_points[outer_el.2], inner_points[inner_el.2])) {
+                            //     if !(Vec3::sub(outer_points[outer_el.2], inner_points[inner_el.1]) ==
+                            //          Vec3::sub(outer_points[outer_el.1], inner_points[inner_el.2])) {
+                            //         panic!();
+                            //     }    
+                            // }
+                            // if !inner_shared.contains(&inner_points[inner_el.1]) {
+                                inner_shared.push(inner_points[inner_el.1]);
+                            // }
+
+                            // if inner_shared.contains(&inner_points[inner_el.2]){
+                                inner_shared.push(inner_points[inner_el.2]);
+                            // }
+
+                            shared_indices.push((outer_el.1, inner_el.1, outer_el.2, inner_el.2));
+                            shared_indices.push((outer_el.1, inner_el.1, outer_el.2, inner_el.2));
+                        },
+                        None => ()
                     }
                 }
 
-                num_hits += 1;
+                if shared_points.len() >= 12 {
+                    let mut local_filter = HashSet::new();
+
+                    for i in 0..inner_shared.len() {
+                        let el = &shared_indices[i];
+                        let translate =
+                        if Vec3::sub(outer_points[el.0], inner_points[el.1]) == Vec3::sub(outer_points[el.2], inner_points[el.3]) {
+                            Vec3::sub(outer_points[el.0], inner_points[el.1])
+                        } else if 
+                        Vec3::sub(outer_points[el.2], inner_points[el.1]) == Vec3::sub(outer_points[el.0], inner_points[el.3]) {
+                            Vec3::sub(outer_points[el.2], inner_points[el.1])
+                        } else {
+                            panic!();
+                        };                    
+
+                        let abs = Vec3::add(inner_shared[i], translate);
+                        match local_filter.get(&abs) {
+                            Some(_) => (),
+                            None => {
+                                local_filter.insert(abs);
+                                println!("Abs point: {} {} {}", abs.x, abs.y, abs.z);
+                            }
+                        }
+                        // println!("Abs point: {} {} {}", abs.x, abs.y, abs.z);
+                    }
+
+                    panic!();
+
+                    // for p in &shared_points {
+                    //     unique_points.insert(*p);
+                    // }
+                    // break 'orient;
+                }
             }
         }
-
-        if shared_points.len() >= 12 {
-            println!("These intersect at axis type {} with points!", idx);
-            for point in &shared_points {
-                println!("({}, {}, {})", point.x, point.y, point.z);
-            }
-            // break 'inner;
-        }
-
-        // 'inner: for dst in &permut_distances {
-        //     if base_distances.contains(dst) {
-        //         num_hits += 1;
-        //     }
-
-        //     if num_hits >= 12 {
-        //         println!("These intersect at axis type {}!", idx);
-        //         break 'inner;
-        //     }
-        // }
     }
+
+
+    println!("Num points: {}", unique_points.len());
 
     // Generate distance from between each point in set
     // rotate in all directions, check if we can find 12 of the same
@@ -205,30 +295,3 @@ pub fn run(root_dir: &Path) {
     // B1 has a 1000 unit distance in x (500 -> -500 = 1000), but B2 has a 1001 unit distance
     // (500 -> 1501 = 1001) so it falls outside of the detection range.
 }
-
-     // if (forward % 2) == 0 {
-                //     // fwd_idx *= -1;
-                //     print!("{} ", fwd_idx);
-                // } else {
-                //     print!("-{} ", fwd_idx);
-                // }
-
-                // print!("{} ", up_idx);
-                // print!(" {}\n", r_idx);
-
-                // if (forward % 2) == 0 {
-                //     // fwd_idx *= -1;
-                //     print!("{} ", fwd_idx);
-                // } else {
-                //     print!("-{} ", fwd_idx);
-                // }
-
-                // print!("-{} ", up_idx);
-                // print!(" {}\n", r_idx);
-
-                // let permut = Vec3::new(
-                //     location.idx(),
-                //     0,
-                //     0
-                // );
-            // }
