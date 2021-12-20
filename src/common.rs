@@ -170,3 +170,38 @@ pub fn get_box_taps(idx: usize, width: usize, height: usize) -> [Option<usize>; 
     
     coords
 }
+
+// https://floating-point-gui.de/errors/comparison/
+pub fn f32_near_equal(a: f32, b: f32) -> bool {
+    let pretty_small_flt = 1.0e-8;
+    let abs_a = a.abs();
+    let abs_b = b.abs();
+    let diff = (a - b).abs();
+
+    if a == b { // shortcut, handles infinities
+        return true;
+    } else if (a == 0.0) || (b == 0.0) || ((abs_a + abs_b) < f32::MIN) {
+        // a or b is zero or both are extremely close to it
+        // relative error is less meaningful here
+        return diff < (pretty_small_flt * f32::MIN);
+    } else { // use relative error
+        return diff / f32::min(abs_a + abs_b, f32::MAX) < pretty_small_flt;
+    }
+}
+
+#[cfg(test)] 
+mod tests {
+    use super::f32_near_equal;
+
+    #[test]
+    fn flt_test() {
+        assert!(f32_near_equal(0.0, 0.0));
+        assert!(f32_near_equal(0.1, 0.1));
+        assert!(f32_near_equal(0.001240, 0.001240));
+        assert!(!f32_near_equal(0.001240, 0.0012438));
+        assert!(!f32_near_equal(3.5, 5.3));
+        assert!(f32_near_equal(1317.00452, 1317.00452));
+        assert!(!f32_near_equal(1317.00452, 1317.00422));
+        assert!(!f32_near_equal(1317.00452, 1317.10022));
+    }
+}
