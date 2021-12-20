@@ -65,10 +65,10 @@ fn enhance_image(default_pixel: char, image: &[char], width: usize, height: usiz
     }
 
 
-    print_image(&image, width);
-    println!("====== Before ======");
-    print_image(&new_image, new_image_width);
-    println!("====== After ======");
+    // print_image(&image, width);
+    // println!("====== Before ======");
+    // print_image(&new_image, new_image_width);
+    // println!("====== After ======");
 
     (new_image, new_image_width, new_image_height)
 }
@@ -77,7 +77,7 @@ pub fn run(root_dir: &Path) {
     let input_path = root_dir.join("day20_input.txt");
     let bytes = common::read_input_bytes(input_path.as_path());
 
-    let enhancement = {
+    let enhancer = {
         bytes.iter().map(|b| *b as char)
             .take_while(|c| !common::is_newline(*c))
             .collect::<Vec<_>>()
@@ -101,11 +101,26 @@ pub fn run(root_dir: &Path) {
         (image, width)
     };
 
+    let odd_gen_default = *enhancer.first().unwrap();
+    let even_gen_idx = {
+        let lookup = vec![odd_gen_default; 9];
+        lookup_str_to_number(&lookup)
+    };
+    let even_gen_default = enhancer[even_gen_idx as usize];
+
     let mut height = image.len() / width;
-    let iterations = 2;
+    let iterations = 50;
     for gen in 0..iterations {
-        let default_pixel = if gen % 2 == 0 { '.' } else { '#' };
-        let (new_image, new_width, new_height) = enhance_image(default_pixel, &image, width, height, &enhancement);
+        // This is the "catch" of this problem: The grid is infinite, and starts on off.
+        // In theory, all of those infinite pixels get sampled too, and flipped to the
+        // value at 0 of enhancer (since all samples 0 -> lookup idx 0). Then on the next
+        // gen they flip to whatever element we get from 9 taps of our initial flip (could
+        // be on or off). They then keep flipping back every generation. But since the only
+        // actual state is our grid, we can just know all those other pixels flipped and
+        // use their generation's pixel val as our default if we tap outside the current grid.
+        let default_pixel = if gen % 2 == 0 { even_gen_default } else { odd_gen_default };
+        
+        let (new_image, new_width, new_height) = enhance_image(default_pixel, &image, width, height, &enhancer);
         image = new_image;
         width = new_width;
         height = new_height;
