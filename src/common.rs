@@ -189,6 +189,10 @@ pub fn f32_near_equal(a: f32, b: f32) -> bool {
     }
 }
 
+pub fn is_newline(c: char) -> bool {
+    (c == '\n') || (c == '\r')
+}
+
 #[cfg(test)] 
 mod tests {
     use super::f32_near_equal;
