@@ -1,60 +1,84 @@
-use super::common;
-use core::num;
 use std::path::Path;
+use std::collections::HashMap;
 
-pub fn run(root_dir: &Path) {
-    // Player 1 starting position: 1
-    // Player 2 starting position: 10
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
+struct GameState {
+    turn_pos: u32,
+    other_pos: u32,
+    turn_score: u32,
+    other_score: u32,
+    p1_took_turn: bool,
+    p2_took_turn: bool,
+}
 
-    let mut p1_pos: u32 = 1;
-    let mut p2_pos: u32 = 10;
+const MAX_SCORE: u32 = 21;
 
-    let mut p1_score: u32 = 0;
-    let mut p2_score: u32 = 0;
+struct Cache {
+    entries: HashMap<GameState, (u64, u64)>
+}
 
-    let mut num_rolls: u32 = 0;
-    loop {
-        fn step(mut rolls: u32, mut pos: u32) -> (u32, u32) { // (new_rolls, new_pos)
-            rolls += 1;
-            let mut move_by = rolls; 
-            rolls += 1;
-            move_by += rolls;
-            rolls += 1;
-            move_by += rolls;
 
-            if move_by >= 10 {
-                move_by = move_by - ((move_by / 10) * 10);
-            }
+const POSSIBLE_ROLLS: [u32;27] = [
+    3,
+    4,4,4,
+    5,5,5, 5,5,5, 
+    6,6,6, 6,6,6, 6, 
+    7,7,7, 7,7,7, 
+    8,8,8, 
+    9,];
 
-            pos += move_by;
-            if pos > 10 {
-                pos -= 10;
-            }
-
-            (rolls, pos)
-        }
-        {
-            let (new_rolls, new_pos) = step(num_rolls, p1_pos);
-            num_rolls = new_rolls;
-            p1_pos = new_pos;
-            p1_score += p1_pos;
-        }
-        if p1_score >= 1000 {
-            break;
-        }
-        {
-            let (new_rolls, new_pos) = step(num_rolls, p2_pos);
-            num_rolls = new_rolls;
-            p2_pos = new_pos;
-            p2_score += p2_pos;
-        }
-        if p2_score >= 1000 {
-            break;
-        }
+fn solve2(state: &GameState, cache: &mut Cache) -> (u64, u64) {
+    // Slightly clunky but: We computed the "other score"
+    // last turn. So we check here before running the next turn.
+    if state.other_score >= MAX_SCORE {
+        if state.p1_took_turn { return (1, 0) }
+        if state.p2_took_turn { return (0, 1) }
     }
 
-    println!("Scores: p1 = {} p2 = {}", p1_score, p2_score);
+    if let Some(entry) = cache.entries.get(state) {
+        return *entry;
+    }
 
-    let min_score = p1_score.min(p2_score);
-    println!("{} * {} = {}", min_score, num_rolls, min_score * num_rolls);
+    let mut score = (0,0);
+
+    for d1 in &POSSIBLE_ROLLS {
+        let mut st = *state;
+
+        st.turn_pos += d1;
+        if st.turn_pos > 10 { st.turn_pos -= 10 }
+        st.turn_score += st.turn_pos;
+
+        // Players take alternating turns, at each which the universes split.
+        // For slightly less branching, we switch the current turn values, rather
+        // than computing the turn based on the turn flag.
+        std::mem::swap(&mut st.turn_pos, &mut st.other_pos);
+        std::mem::swap(&mut st.turn_score, &mut st.other_score);
+        std::mem::swap(&mut st.p1_took_turn, &mut st.p2_took_turn);
+
+        let (score1, score2) = solve2(&st, cache);
+        score.0 += score1;
+        score.1 += score2;
+    }
+
+    cache.entries.insert(*state, score);
+
+    score
+}
+
+pub fn run(_: &Path) {    
+    let mut cache = Cache { entries: HashMap::new() };
+
+    let initial_state = GameState {
+        turn_pos: 1,
+        other_pos: 10,
+        turn_score: 0,
+        other_score: 0,
+        p1_took_turn: false,
+        p2_took_turn: true,
+    };
+
+    let (p1_wins, p2_wins) = solve2(&initial_state, &mut cache);
+
+    println!("P1 wins {} P2 wins {}", p1_wins, p2_wins);
+    println!("Max {}", p1_wins.max(p2_wins));
 }
