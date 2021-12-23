@@ -21,6 +21,7 @@ mod day19;
 mod day20;
 mod day21;
 mod day22;
+mod day23;
 
 use std::path::Path;
 
@@ -77,6 +78,8 @@ fn main() {
     // day20::run(root_dir);
     // println!("Running day 21");
     // day21::run(root_dir);
-    println!("Running day 22");
-    day22::run(root_dir);
+    // println!("Running day 22");
+    // day22::run(root_dir);
+    println!("Running day 23");
+    day23::run(root_dir);
 }
